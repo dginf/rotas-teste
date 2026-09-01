@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rota do Cordeiro — Rotas de Integração Nacional</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="loading"><div class="spinner"></div><p>Carregando dados...</p></div>
+
+<header class="topbar">
+  <div class="dash-header">
+    <div class="dash-header-left">
+      <h1>Rota do Cordeiro</h1>
+      <p>Rotas de Integração Nacional · Ministério da Integração e do Desenvolvimento Regional</p>
+    </div>
+    <div class="data-carga">🐑 Piloto de migração — dados até 2023</div>
+  </div>
+</header>
+
+<nav class="topnav">
+  <a data-view="apresentacao" class="active">Apresentação</a>
+  <a data-view="pib-populacao">PIB &amp; População</a>
+  <a data-view="pib-per-capita">PIB Per Capita</a>
+  <a data-view="valor-adicionado">Valor Adicionado</a>
+  <a data-view="indicadores-socioeconomicos">Indicadores Socioeconômicos</a>
+  <a data-view="producao-la">Produção de Lã</a>
+  <a data-view="ovinos">Ovinos</a>
+  <a data-view="indicadores-cordeiros">Indicadores da Produção</a>
+  <a data-view="trabalho">Trabalho</a>
+  <a data-view="indicadores-mercado-trabalho">Mercado de Trabalho</a>
+  <a data-view="indicadores-ambientais">Indicadores Ambientais</a>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <h3>🔍 Filtros</h3>
+    <div class="group">
+      <div class="group-label">Ano (de)</div>
+      <select id="f-ano-ini"></select>
+      <div style="margin:4px 0"></div>
+      <div class="group-label">Ano (até)</div>
+      <select id="f-ano-fim"></select>
+    </div>
+    <div class="group">
+      <div class="group-label">Estado</div>
+      <select id="f-uf"><option value="">Todos</option></select>
+    </div>
+    <div class="group">
+      <div class="group-label">Polo</div>
+      <select id="f-polo"><option value="">Todos</option></select>
+    </div>
+    <div class="group">
+      <div class="group-label">Município</div>
+      <select id="f-mun"><option value="">Todos</option></select>
+    </div>
+    <button class="btn-reset" id="btn-reset">↺ Limpar filtros</button>
+  </aside>
+
+  <main class="main">
+
+    <!-- APRESENTAÇÃO -->
+    <div class="view active" id="view-apresentacao">
+      <div class="card">
+        <h2>PIB Per Capita Médio por Polo e Município</h2>
+        <p class="desc">Visão geral da Rota do Cordeiro — o tamanho do círculo indica o PIB per capita do município no último ano disponível.</p>
+        <div id="map-apresentacao" class="leaflet-map"></div>
+      </div>
+    </div>
+
+    <!-- PIB & POPULAÇÃO -->
+    <div class="view" id="view-pib-populacao">
+      <div class="kpi-row" id="kpi-pib-pop"></div>
+      <div class="card">
+        <h2>PIB por Ano e Polo</h2>
+        <div class="chartwrap"><canvas id="chart-pib-polo"></canvas></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h2>População por Ano e Polo</h2>
+          <div class="chartwrap"><canvas id="chart-pop-polo"></canvas></div>
+        </div>
+        <div class="card">
+          <h2>Composição do PIB por Estado</h2>
+          <p class="desc">Substitui o treemap original — mesma informação, formato doughnut.</p>
+          <div class="chartwrap"><canvas id="chart-pib-uf"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PIB PER CAPITA -->
+    <div class="view" id="view-pib-per-capita">
+      <div class="card">
+        <h2>PIB Per Capita Médio por Polo e Município</h2>
+        <div id="map-pib-pc" class="leaflet-map"></div>
+      </div>
+      <div class="card">
+        <h2>PIB Per Capita por Ano e Polo</h2>
+        <div class="chartwrap"><canvas id="chart-pibpc-polo"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>PIB por Município (último ano)</h2></div>
+        <div class="tbl-wrap"><table id="tbl-pib-pc"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- VALOR ADICIONADO -->
+    <div class="view" id="view-valor-adicionado">
+      <div class="kpi-row" id="kpi-valor-adicionado"></div>
+      <div class="card">
+        <h2>Valor Adicionado por Ano e Polo</h2>
+        <div class="chartwrap"><canvas id="chart-va-polo"></canvas></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h2>Composição por Grande Setor</h2>
+          <div class="chartwrap"><canvas id="chart-va-setor"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h2>Detalhamento por Município</h2></div>
+          <div class="tbl-wrap"><table id="tbl-va"><thead></thead><tbody></tbody></table></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- INDICADORES SOCIOECONÔMICOS (explorer) -->
+    <div class="view" id="view-indicadores-socioeconomicos">
+      <div class="card explorer-body">
+        <div class="card-header"><h2>Explorador de Indicadores Socioeconômicos</h2></div>
+        <div class="group" style="max-width:420px;">
+          <div class="group-label">Escolha o indicador</div>
+          <select id="view-indicadores-socioeconomicos-select"></select>
+        </div>
+        <div class="info-card explorer-info"></div>
+        <div class="chartwrap"><canvas class="explorer-canvas"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Detalhamento por Município</h2></div>
+        <div class="tbl-wrap"><table class="explorer-table"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- PRODUÇÃO DE LÃ -->
+    <div class="view" id="view-producao-la">
+      <div class="kpi-row" id="kpi-la"></div>
+      <div class="card">
+        <h2>Valor Produzido de Lã por Ano e Polo</h2>
+        <div class="chartwrap"><canvas id="chart-la-polo"></canvas></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h2>Valor Produzido de Lã por Estado</h2>
+          <p class="desc">Substitui o gráfico de funil original por um ranking em barras horizontais.</p>
+          <div class="chartwrap"><canvas id="chart-la-uf"></canvas></div>
+        </div>
+        <div class="card">
+          <h2>Valor da Produção de Lã por Polo e Município</h2>
+          <div id="map-la" class="leaflet-map chartwrap"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OVINOS -->
+    <div class="view" id="view-ovinos">
+      <div class="kpi-row" id="kpi-ovinos"></div>
+      <div class="card">
+        <h2>Rebanho de Ovinos por Ano e Polo</h2>
+        <div class="chartwrap"><canvas id="chart-ovinos-polo"></canvas></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h2>Rebanho de Ovinos por Estado</h2>
+          <div class="chartwrap"><canvas id="chart-ovinos-uf"></canvas></div>
+        </div>
+        <div class="card">
+          <h2>Rebanho de Ovinos por Polo e Município</h2>
+          <div id="map-ovinos" class="leaflet-map chartwrap"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- INDICADORES DA PRODUÇÃO DE CORDEIROS (explorer) -->
+    <div class="view" id="view-indicadores-cordeiros">
+      <div class="card explorer-body">
+        <div class="card-header"><h2>Indicadores da Produção de Cordeiros</h2></div>
+        <div class="group" style="max-width:420px;">
+          <div class="group-label">Escolha o indicador</div>
+          <select id="view-indicadores-cordeiros-select"></select>
+        </div>
+        <div class="info-card explorer-info"></div>
+        <div class="chartwrap"><canvas class="explorer-canvas"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Detalhamento por Município</h2></div>
+        <div class="tbl-wrap"><table class="explorer-table"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- TRABALHO -->
+    <div class="view" id="view-trabalho">
+      <div class="kpi-row" id="kpi-trabalho"></div>
+      <div class="grid-2">
+        <div class="card">
+          <h2>Vínculos Ativos por Ano e Polo</h2>
+          <div class="chartwrap"><canvas id="chart-vinc-polo"></canvas></div>
+        </div>
+        <div class="card">
+          <h2>Massa Salarial por Ano e Polo</h2>
+          <div class="chartwrap"><canvas id="chart-massa-polo"></canvas></div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h2>Massa Salarial por Estado</h2>
+          <div class="chartwrap"><canvas id="chart-massa-uf"></canvas></div>
+        </div>
+        <div class="card">
+          <h2>Massa Salarial por Polo e Município</h2>
+          <div id="map-trabalho" class="leaflet-map chartwrap"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- INDICADORES DO MERCADO DE TRABALHO (explorer) -->
+    <div class="view" id="view-indicadores-mercado-trabalho">
+      <div class="card explorer-body">
+        <div class="card-header"><h2>Indicadores do Mercado de Trabalho</h2></div>
+        <div class="group" style="max-width:420px;">
+          <div class="group-label">Escolha o indicador</div>
+          <select id="view-indicadores-mercado-trabalho-select"></select>
+        </div>
+        <div class="info-card explorer-info"></div>
+        <div class="chartwrap"><canvas class="explorer-canvas"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Detalhamento por Município</h2></div>
+        <div class="tbl-wrap"><table class="explorer-table"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- INDICADORES AMBIENTAIS (explorer) -->
+    <div class="view" id="view-indicadores-ambientais">
+      <div class="card explorer-body">
+        <div class="card-header"><h2>Indicadores Ambientais</h2></div>
+        <div class="group" style="max-width:420px;">
+          <div class="group-label">Escolha o indicador</div>
+          <select id="view-indicadores-ambientais-select"></select>
+        </div>
+        <div class="info-card explorer-info"></div>
+        <div class="chartwrap"><canvas class="explorer-canvas"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Detalhamento por Município</h2></div>
+        <div class="tbl-wrap"><table class="explorer-table"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="rodape">
+  Rota do Cordeiro · Piloto de migração do Power BI · Rotas de Integração Nacional — Ministério da Integração e do Desenvolvimento Regional
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
