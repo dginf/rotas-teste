@@ -33,7 +33,7 @@
   <a data-view="ovinos">Ovinos</a>
   <a data-view="indicadores-cordeiros">Indicadores da Produção</a>
   <a data-view="trabalho">Trabalho</a>
-  <a data-view="indicadores-mercado-trabalho">Mercado de Trabalho</a>
+  <a data-view="indicadores-mercado-trabalho">Indicadores do Mercado de Trabalho</a>
   <a data-view="indicadores-ambientais">Indicadores Ambientais</a>
 </nav>
 
@@ -66,10 +66,12 @@
 
     <!-- APRESENTAÇÃO -->
     <div class="view active" id="view-apresentacao">
+      <div class="card" id="texto-apresentacao" style="font-size:13.5px;line-height:1.8;"></div>
       <div class="card">
         <h2>PIB Per Capita Médio por Polo e Município</h2>
-        <p class="desc">Visão geral da Rota do Cordeiro — o tamanho do círculo indica o PIB per capita do município no último ano disponível.</p>
+        <p class="desc">Visão geral da Rota do Cordeiro — o tamanho do círculo indica o PIB per capita do município no último ano disponível; a cor indica o polo.</p>
         <div id="map-apresentacao" class="leaflet-map"></div>
+        <div id="map-apresentacao-legend" class="legend" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:4px 16px;"></div>
       </div>
     </div>
 
@@ -78,18 +80,17 @@
       <div class="kpi-row" id="kpi-pib-pop"></div>
       <div class="card">
         <h2>PIB por Ano e Polo</h2>
+        <p class="desc">O número no topo de cada coluna é o total do ano, somando todos os polos.</p>
         <div class="chartwrap"><canvas id="chart-pib-polo"></canvas></div>
       </div>
-      <div class="grid-2">
-        <div class="card">
-          <h2>População por Ano e Polo</h2>
-          <div class="chartwrap"><canvas id="chart-pop-polo"></canvas></div>
-        </div>
-        <div class="card">
-          <h2>Composição do PIB por Estado</h2>
-          <p class="desc">Substitui o treemap original — mesma informação, formato doughnut.</p>
-          <div class="chartwrap"><canvas id="chart-pib-uf"></canvas></div>
-        </div>
+      <div class="card">
+        <h2>População por Ano e Polo</h2>
+        <div class="chartwrap"><canvas id="chart-pop-polo"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Composição do PIB por Estado e Polo</h2>
+        <p class="desc">Substitui o treemap original — barra empilhada mostrando os dois níveis (Estado no eixo, Polo na cor), sem perder a informação do polo.</p>
+        <div class="chartwrap" style="height:340px;"><canvas id="chart-pib-uf"></canvas></div>
       </div>
     </div>
 
@@ -98,6 +99,7 @@
       <div class="card">
         <h2>PIB Per Capita Médio por Polo e Município</h2>
         <div id="map-pib-pc" class="leaflet-map"></div>
+        <div id="map-pib-pc-legend" class="legend" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:4px 16px;"></div>
       </div>
       <div class="card">
         <h2>PIB Per Capita por Ano e Polo</h2>
@@ -159,8 +161,10 @@
           <div class="chartwrap"><canvas id="chart-la-uf"></canvas></div>
         </div>
         <div class="card">
-          <h2>Valor da Produção de Lã por Polo e Município</h2>
+          <h2>Composição do Rebanho de Lã por Polo</h2>
+          <p class="desc">Cor indica o polo; tamanho do círculo indica o valor produzido no último ano.</p>
           <div id="map-la" class="leaflet-map chartwrap"></div>
+          <div id="map-la-legend" class="legend" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:4px 16px;"></div>
         </div>
       </div>
     </div>
@@ -178,8 +182,10 @@
           <div class="chartwrap"><canvas id="chart-ovinos-uf"></canvas></div>
         </div>
         <div class="card">
-          <h2>Rebanho de Ovinos por Polo e Município</h2>
+          <h2>Composição do Rebanho de Ovinos por Polo</h2>
+          <p class="desc">Cor indica o polo; tamanho do círculo indica o rebanho no último ano.</p>
           <div id="map-ovinos" class="leaflet-map chartwrap"></div>
+          <div id="map-ovinos-legend" class="legend" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:4px 16px;"></div>
         </div>
       </div>
     </div>
@@ -204,15 +210,13 @@
     <!-- TRABALHO -->
     <div class="view" id="view-trabalho">
       <div class="kpi-row" id="kpi-trabalho"></div>
-      <div class="grid-2">
-        <div class="card">
-          <h2>Vínculos Ativos por Ano e Polo</h2>
-          <div class="chartwrap"><canvas id="chart-vinc-polo"></canvas></div>
-        </div>
-        <div class="card">
-          <h2>Massa Salarial por Ano e Polo</h2>
-          <div class="chartwrap"><canvas id="chart-massa-polo"></canvas></div>
-        </div>
+      <div class="card">
+        <h2>Vínculos Ativos por Ano e Polo</h2>
+        <div class="chartwrap"><canvas id="chart-vinc-polo"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Massa Salarial por Ano e Polo</h2>
+        <div class="chartwrap"><canvas id="chart-massa-polo"></canvas></div>
       </div>
       <div class="grid-2">
         <div class="card">
@@ -222,6 +226,7 @@
         <div class="card">
           <h2>Massa Salarial por Polo e Município</h2>
           <div id="map-trabalho" class="leaflet-map chartwrap"></div>
+          <div id="map-trabalho-legend" class="legend" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:4px 16px;"></div>
         </div>
       </div>
     </div>

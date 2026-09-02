@@ -14,10 +14,18 @@ const CORES_POLO = ['#1351b4','#009C3B','#b6790a','#c62828','#6b21a8','#0891b2',
 
 // Indicadores específicos usados em cartões/gráficos fixos
 const IND = {
-  empresas: 'rais_estab_11', vinculos: 'rais_estab_25', massaSalarial: 'rais_vinc_14',
+  empresas: 'rais_estab_53',   // Número Total de Empresas (não confundir com rais_estab_11, específico de Ovinocultura)
+  vinculos: 'rais_estab_54',   // Total de Vínculos Formais (não confundir com rais_estab_25, específico de Agropecuária)
+  massaSalarial: 'rais_vinc_14',
   laQtd: 'ppm_prod_13', laValor: 'ppm_prod_14', laProporcao: 'ppm_prod_15',
   rebanhoOvinos: 'ppm_reb_3', ovinosTosquiados: 'ppm_ovinos_1', rebanhoTotal: 'ppm_reb_5',
 };
+
+const TEXTO_APRESENTACAO = [
+  "A Rota do Cordeiro, iniciativa do Ministério da Integração e do Desenvolvimento Regional (MIDR), fortalece a ovinocaprinocultura no Brasil. O foco é gerar renda e promover o desenvolvimento regional sustentável através da produção de carne, leite, couro e derivados, estruturando a cadeia produtiva.",
+  "A Rota atua em assistência técnica, capacitação, melhoramento genético, adequação sanitária e acesso a mercados. Investindo em infraestrutura e inovação, a Rota busca aumentar a eficiência da produção, desde a criação até a comercialização, especialmente em regiões com potencial, mas com desafios.",
+  "A iniciativa contribui para a segurança alimentar, o desenvolvimento sustentável e a melhoria da qualidade de vida nas áreas rurais.",
+];
 
 let DATA = { fato: [], basicos: [], valorAdicionado: [], municipios: [], localizacao: {}, dimIndicador: [] };
 let MUN = {};   // cod_mun -> {polo, sg_uf, estado, des_municipio}
@@ -25,6 +33,7 @@ let INDBYID = {}; // id_indicador -> metadados
 let FILTROS = { anoIni: null, anoFim: null, uf: '', polo: '', mun: '' };
 let charts = {};
 let mapInstances = {};
+let TODOS_POLOS = []; // ordem fixa, definida uma vez, pra cor do polo nunca mudar entre páginas/filtros
 
 // ============================================================
 // UTILITÁRIOS
@@ -44,9 +53,31 @@ function fmtAuto(v, formato) {
 function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
 function destroyMap(id) { if (mapInstances[id]) { mapInstances[id].remove(); delete mapInstances[id]; } }
 
-function corPolo(polo, polosOrdenados) {
-  const i = polosOrdenados.indexOf(polo);
-  return CORES_POLO[i % CORES_POLO.length];
+// Plugin pequeno pra desenhar o rótulo do total em cima de cada coluna empilhada
+// (Chart.js não tem isso nativo, sem instalar plugin externo)
+function pluginTotalEmpilhado(formatador) {
+  return {
+    id: 'totalEmpilhado',
+    afterDatasetsDraw(chart) {
+      const { ctx, data, scales: { x, y } } = chart;
+      ctx.save();
+      ctx.font = 'bold 11px Roboto, sans-serif';
+      ctx.fillStyle = '#232323';
+      ctx.textAlign = 'center';
+      data.labels.forEach((_, i) => {
+        let total = 0;
+        data.datasets.forEach(ds => { total += ds.data[i] || 0; });
+        if (!total) return;
+        ctx.fillText(formatador(total), x.getPixelForValue(i), y.getPixelForValue(total) - 6);
+      });
+      ctx.restore();
+    }
+  };
+}
+
+function corPolo(polo) {
+  const i = TODOS_POLOS.indexOf(polo);
+  return i === -1 ? '#999' : CORES_POLO[i % CORES_POLO.length];
 }
 
 // ============================================================
@@ -73,6 +104,7 @@ async function carregarDados() {
 
     municipiosRaw.forEach(m => { MUN[m.cod_mun] = m; });
     dimRaw.forEach(d => { INDBYID[d.id] = d; });
+    TODOS_POLOS = [...new Set(municipiosRaw.map(m => m.polo))].filter(Boolean).sort();
 
     popularFiltrosGlobais();
     document.getElementById('loading').style.display = 'none';
@@ -204,6 +236,11 @@ document.addEventListener('DOMContentLoaded', () => {
 // APRESENTAÇÃO
 // ============================================================
 function renderApresentacao() {
+  const textoEl = document.getElementById('texto-apresentacao');
+  if (textoEl && !textoEl.dataset.preenchido) {
+    textoEl.innerHTML = TEXTO_APRESENTACAO.map(p => `<p>${p}</p>`).join('');
+    textoEl.dataset.preenchido = '1';
+  }
   const basicos = filtrarBasicos();
   const ano = ultimoAno(basicos);
   const doAno = basicos.filter(r => r.ano === ano);
@@ -239,8 +276,9 @@ function renderPibPopulacao() {
   destroyChart('chart-pib-polo');
   charts['chart-pib-polo'] = new Chart(document.getElementById('chart-pib-polo').getContext('2d'), {
     type: 'bar',
-    data: { labels: anos, datasets: polos.map(p => ({ label: p, data: anos.map(a => byPoloAno[p]?.[a] || 0), backgroundColor: corPolo(p, polos) })) },
-    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}}}, scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>'R$'+(v/1e6).toFixed(0)+'M'}}} }
+    data: { labels: anos, datasets: polos.map(p => ({ label: p, data: anos.map(a => byPoloAno[p]?.[a] || 0), backgroundColor: corPolo(p) })) },
+    plugins: [pluginTotalEmpilhado(v => fmtR(v))],
+    options: { responsive:true, maintainAspectRatio:false, layout:{padding:{top:20}}, plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}}}, scales:{x:{stacked:true},y:{stacked:true,ticks:{callback:v=>'R$'+(v/1e6).toFixed(0)+'M'}}} }
   });
 
   // População por Ano e Polo (área empilhada -> usamos bar empilhada como equivalente)
@@ -253,19 +291,30 @@ function renderPibPopulacao() {
   destroyChart('chart-pop-polo');
   charts['chart-pop-polo'] = new Chart(document.getElementById('chart-pop-polo').getContext('2d'), {
     type: 'line',
-    data: { labels: anos, datasets: polos.map(p => ({ label: p, data: anos.map(a => byPoloAnoPop[p]?.[a] || 0), borderColor: corPolo(p, polos), backgroundColor: corPolo(p,polos)+'55', fill:true, tension:.25 })) },
+    data: { labels: anos, datasets: polos.map(p => ({ label: p, data: anos.map(a => byPoloAnoPop[p]?.[a] || 0), borderColor: corPolo(p), backgroundColor: corPolo(p)+'55', fill:true, tension:.25 })) },
     options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}}}, scales:{y:{stacked:true,ticks:{callback:v=>fmtI(v)}}} }
   });
 
-  // Composição média do PIB por Estado (substitui treemap por doughnut)
-  const byUf = {};
-  doAno.forEach(r => { const uf = MUN[r.cod_mun]?.sg_uf || '—'; byUf[uf] = (byUf[uf]||0) + (r.pib||0); });
-  const ufs = Object.keys(byUf).sort((a,b)=>byUf[b]-byUf[a]);
+  // Composição do PIB por Estado, com o detalhe por Polo dentro de cada barra
+  // (era um treemap no original; doughnut simples perderia a dimensão do polo,
+  // então usamos barra horizontal empilhada — Estado no eixo, Polo como cor)
+  const byUfPolo = {};
+  doAno.forEach(r => {
+    const uf = MUN[r.cod_mun]?.sg_uf || '—'; const polo = MUN[r.cod_mun]?.polo || '—';
+    byUfPolo[uf] = byUfPolo[uf] || {};
+    byUfPolo[uf][polo] = (byUfPolo[uf][polo] || 0) + (r.pib || 0);
+  });
+  const ufsOrdenadas = Object.keys(byUfPolo).sort((a,b) => {
+    const totalA = Object.values(byUfPolo[a]).reduce((s,v)=>s+v,0);
+    const totalB = Object.values(byUfPolo[b]).reduce((s,v)=>s+v,0);
+    return totalB - totalA;
+  });
+  const polosNaComposicao = [...new Set(doAno.map(r => MUN[r.cod_mun]?.polo).filter(Boolean))].sort();
   destroyChart('chart-pib-uf');
   charts['chart-pib-uf'] = new Chart(document.getElementById('chart-pib-uf').getContext('2d'), {
-    type: 'doughnut',
-    data: { labels: ufs, datasets: [{ data: ufs.map(u=>byUf[u]), backgroundColor: ufs.map((u,i)=>CORES_POLO[i%CORES_POLO.length]) }] },
-    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}}} }
+    type: 'bar',
+    data: { labels: ufsOrdenadas, datasets: polosNaComposicao.map(p => ({ label: p, data: ufsOrdenadas.map(u => byUfPolo[u][p] || 0), backgroundColor: corPolo(p) })) },
+    options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:9}}}}, scales:{x:{stacked:true,ticks:{callback:v=>'R$'+(v/1e6).toFixed(0)+'M'}},y:{stacked:true}} }
   });
 }
 
@@ -290,7 +339,7 @@ function renderPibPerCapita() {
   destroyChart('chart-pibpc-polo');
   charts['chart-pibpc-polo'] = new Chart(document.getElementById('chart-pibpc-polo').getContext('2d'), {
     type: 'bar',
-    data: { labels: anos, datasets: polos.map(p => ({ label: p, data: anos.map(a => (byPoloAno[p]?.[a]||0)/(cntPoloAno[p]?.[a]||1)), backgroundColor: corPolo(p, polos) })) },
+    data: { labels: anos, datasets: polos.map(p => ({ label: p, data: anos.map(a => (byPoloAno[p]?.[a]||0)/(cntPoloAno[p]?.[a]||1)), backgroundColor: corPolo(p) })) },
     options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}}}, scales:{y:{ticks:{callback:v=>fmtR(v)}}} }
   });
 
@@ -328,7 +377,7 @@ function renderValorAdicionado() {
   destroyChart('chart-va-polo');
   charts['chart-va-polo'] = new Chart(document.getElementById('chart-va-polo').getContext('2d'), {
     type: 'bar',
-    data: { labels: anos, datasets: polos.map(p => ({ label: p, data: anos.map(a => byPoloAno[p]?.[a] || 0), backgroundColor: corPolo(p, polos) })) },
+    data: { labels: anos, datasets: polos.map(p => ({ label: p, data: anos.map(a => byPoloAno[p]?.[a] || 0), backgroundColor: corPolo(p) })) },
     options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}}}, scales:{y:{ticks:{callback:v=>'R$'+(v/1e6).toFixed(0)+'M'}}} }
   });
 
@@ -360,18 +409,19 @@ function renderValorAdicionado() {
 // ============================================================
 function renderProducaoLa() {
   const rows = filtrarFato([IND.laQtd, IND.laValor, IND.laProporcao]);
-  const ano = ultimoAno(rows);
-  const doAno = rows.filter(r => r.ano === ano);
-  const qtd = doAno.filter(r=>r.id_indicador===IND.laQtd).reduce((s,r)=>s+(r.valor||0),0);
-  const val = doAno.filter(r=>r.id_indicador===IND.laValor).reduce((s,r)=>s+(r.valor||0),0);
-  const propRows = doAno.filter(r=>r.id_indicador===IND.laProporcao);
+  const periodo = `${FILTROS.anoIni}–${FILTROS.anoFim}`;
+  const qtd = rows.filter(r=>r.id_indicador===IND.laQtd).reduce((s,r)=>s+(r.valor||0),0);
+  const val = rows.filter(r=>r.id_indicador===IND.laValor).reduce((s,r)=>s+(r.valor||0),0);
+  const propRows = rows.filter(r=>r.id_indicador===IND.laProporcao);
   const prop = propRows.length ? propRows.reduce((s,r)=>s+(r.valor||0),0)/propRows.length : 0;
 
   document.getElementById('kpi-la').innerHTML = `
-    <div class="kpi"><div class="kl">Produção de Lã — Kg (${ano})</div><div class="kv">${fmtI(qtd)}</div></div>
-    <div class="kpi" style="border-left-color:var(--secondary)"><div class="kl">Valor da Produção — R$1.000 (${ano})</div><div class="kv" style="color:var(--secondary)">${fmtR(val)}</div></div>
-    <div class="kpi" style="border-left-color:var(--amber)"><div class="kl">% da Produção Animal (${ano})</div><div class="kv" style="color:var(--amber)">${fmtPct(prop)}</div></div>
+    <div class="kpi"><div class="kl">Produção de Lã — Kg (${periodo})</div><div class="kv">${fmtI(qtd)}</div></div>
+    <div class="kpi" style="border-left-color:var(--secondary)"><div class="kl">Valor da Produção — R$1.000 (${periodo})</div><div class="kv" style="color:var(--secondary)">${fmtR(val)}</div></div>
+    <div class="kpi" style="border-left-color:var(--amber)"><div class="kl">% da Produção Animal — média (${periodo})</div><div class="kv" style="color:var(--amber)">${fmtPct(prop)}</div></div>
   `;
+  const ano = ultimoAno(rows);
+  const doAno = rows.filter(r => r.ano === ano);
 
   const valRows = filtrarFato([IND.laValor]);
   const polos = [...new Set(valRows.map(r => MUN[r.cod_mun]?.polo).filter(Boolean))].sort();
@@ -381,7 +431,7 @@ function renderProducaoLa() {
   destroyChart('chart-la-polo');
   charts['chart-la-polo'] = new Chart(document.getElementById('chart-la-polo').getContext('2d'), {
     type: 'bar',
-    data: { labels: anos, datasets: polos.map(p => ({ label: p, data: anos.map(a => byPoloAno[p]?.[a] || 0), backgroundColor: corPolo(p, polos) })) },
+    data: { labels: anos, datasets: polos.map(p => ({ label: p, data: anos.map(a => byPoloAno[p]?.[a] || 0), backgroundColor: corPolo(p) })) },
     options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}}} }
   });
 
@@ -403,17 +453,18 @@ function renderProducaoLa() {
 // ============================================================
 function renderOvinos() {
   const rows = filtrarFato([IND.rebanhoOvinos, IND.ovinosTosquiados, IND.rebanhoTotal]);
-  const ano = ultimoAno(rows);
-  const doAno = rows.filter(r => r.ano === ano);
-  const rebanho = doAno.filter(r=>r.id_indicador===IND.rebanhoOvinos).reduce((s,r)=>s+(r.valor||0),0);
-  const tosquiados = doAno.filter(r=>r.id_indicador===IND.ovinosTosquiados).reduce((s,r)=>s+(r.valor||0),0);
-  const total = doAno.filter(r=>r.id_indicador===IND.rebanhoTotal).reduce((s,r)=>s+(r.valor||0),0);
+  const periodo = `${FILTROS.anoIni}–${FILTROS.anoFim}`;
+  const rebanho = rows.filter(r=>r.id_indicador===IND.rebanhoOvinos).reduce((s,r)=>s+(r.valor||0),0);
+  const tosquiados = rows.filter(r=>r.id_indicador===IND.ovinosTosquiados).reduce((s,r)=>s+(r.valor||0),0);
+  const total = rows.filter(r=>r.id_indicador===IND.rebanhoTotal).reduce((s,r)=>s+(r.valor||0),0);
 
   document.getElementById('kpi-ovinos').innerHTML = `
-    <div class="kpi"><div class="kl">Rebanho de Ovinos — Cabeças (${ano})</div><div class="kv">${fmtI(rebanho)}</div></div>
-    <div class="kpi" style="border-left-color:var(--secondary)"><div class="kl">Ovinos Tosquiados — Cabeças (${ano})</div><div class="kv" style="color:var(--secondary)">${fmtI(tosquiados)}</div></div>
-    <div class="kpi" style="border-left-color:var(--amber)"><div class="kl">Rebanho Total — Cabeças (${ano})</div><div class="kv" style="color:var(--amber)">${fmtI(total)}</div></div>
+    <div class="kpi"><div class="kl">Rebanho de Ovinos — Cabeças (${periodo})</div><div class="kv">${fmtI(rebanho)}</div></div>
+    <div class="kpi" style="border-left-color:var(--secondary)"><div class="kl">Ovinos Tosquiados — Cabeças (${periodo})</div><div class="kv" style="color:var(--secondary)">${fmtI(tosquiados)}</div></div>
+    <div class="kpi" style="border-left-color:var(--amber)"><div class="kl">Rebanho Total — Cabeças (${periodo})</div><div class="kv" style="color:var(--amber)">${fmtI(total)}</div></div>
   `;
+  const ano = ultimoAno(rows);
+  const doAno = rows.filter(r => r.ano === ano);
 
   const rebRows = filtrarFato([IND.rebanhoOvinos]);
   const polos = [...new Set(rebRows.map(r => MUN[r.cod_mun]?.polo).filter(Boolean))].sort();
@@ -423,7 +474,7 @@ function renderOvinos() {
   destroyChart('chart-ovinos-polo');
   charts['chart-ovinos-polo'] = new Chart(document.getElementById('chart-ovinos-polo').getContext('2d'), {
     type: 'bar',
-    data: { labels: anos, datasets: polos.map(p => ({ label: p, data: anos.map(a => byPoloAno[p]?.[a] || 0), backgroundColor: corPolo(p, polos) })) },
+    data: { labels: anos, datasets: polos.map(p => ({ label: p, data: anos.map(a => byPoloAno[p]?.[a] || 0), backgroundColor: corPolo(p) })) },
     options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}}} }
   });
 
@@ -465,7 +516,7 @@ function renderTrabalho() {
   destroyChart('chart-vinc-polo');
   charts['chart-vinc-polo'] = new Chart(document.getElementById('chart-vinc-polo').getContext('2d'), {
     type: 'bar',
-    data: { labels: anos, datasets: polos.map(p => ({ label: p, data: anos.map(a => byPoloAno[p]?.[a] || 0), backgroundColor: corPolo(p, polos) })) },
+    data: { labels: anos, datasets: polos.map(p => ({ label: p, data: anos.map(a => byPoloAno[p]?.[a] || 0), backgroundColor: corPolo(p) })) },
     options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}}} }
   });
 
@@ -475,7 +526,7 @@ function renderTrabalho() {
   destroyChart('chart-massa-polo');
   charts['chart-massa-polo'] = new Chart(document.getElementById('chart-massa-polo').getContext('2d'), {
     type: 'bar',
-    data: { labels: anos, datasets: polos.map(p => ({ label: p, data: anos.map(a => byPoloAnoM[p]?.[a] || 0), backgroundColor: corPolo(p, polos) })) },
+    data: { labels: anos, datasets: polos.map(p => ({ label: p, data: anos.map(a => byPoloAnoM[p]?.[a] || 0), backgroundColor: corPolo(p) })) },
     options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}}}, scales:{y:{ticks:{callback:v=>'R$'+(v/1e6).toFixed(1)+'M'}}} }
   });
 
@@ -518,6 +569,7 @@ function renderExplorerIndicadores(viewId, filtroEixo) {
     <b>${meta.nome || idSelecionado}</b><br>
     ${meta.descricao || ''}<br>
     <span style="color:var(--ink-soft)">Fonte: ${meta.fonte || '—'}</span>
+    ${meta.marco_logico ? `<br><span style="color:var(--ink-soft)"><b>Marco lógico:</b> ${meta.marco_logico}</span>` : ''}
   `;
 
   const rows = filtrarFato([idSelecionado]);
@@ -546,7 +598,7 @@ function renderExplorerIndicadores(viewId, filtroEixo) {
 }
 
 // ============================================================
-// MAPA GENÉRICO (Leaflet, marcadores proporcionais)
+// MAPA GENÉRICO (Leaflet, marcadores proporcionais, coloridos por polo)
 // ============================================================
 function renderMapaGenerico(elId, rows, getValor, label, fmt) {
   destroyMap(elId);
@@ -559,6 +611,7 @@ function renderMapaGenerico(elId, rows, getValor, label, fmt) {
   const valores = rows.map(r => getValor(r)).filter(v => v != null && !isNaN(v));
   const max = valores.length ? Math.max(...valores) : 1;
   const min = valores.length ? Math.min(...valores) : 0;
+  const polosNoMapa = new Set();
 
   rows.forEach(r => {
     const loc = DATA.localizacao[String(r.cod_mun)];
@@ -567,8 +620,18 @@ function renderMapaGenerico(elId, rows, getValor, label, fmt) {
     if (v == null || isNaN(v)) return;
     const raio = 4 + 16 * ((v - min) / ((max - min) || 1));
     const mun = MUN[r.cod_mun];
+    const polo = mun?.polo;
+    const cor = corPolo(polo);
+    if (polo) polosNoMapa.add(polo);
     L.circleMarker([loc[0], loc[1]], {
-      radius: raio, color: '#1351b4', weight: 1, fillColor: '#1351b4', fillOpacity: 0.55,
-    }).bindTooltip(`<strong>${mun?.des_municipio || r.cod_mun}</strong><br>${mun?.polo || ''}<br>${label}: ${fmt(v)}`, { sticky: true }).addTo(map);
+      radius: raio, color: cor, weight: 1, fillColor: cor, fillOpacity: 0.65,
+    }).bindTooltip(`<strong>${mun?.des_municipio || r.cod_mun}</strong><br>${polo || ''}<br>${label}: ${fmt(v)}`, { sticky: true }).addTo(map);
   });
+
+  // legenda de cores por polo (só os polos que de fato aparecem no mapa)
+  const legendEl = document.getElementById(elId + '-legend');
+  if (legendEl) {
+    const polosOrdenados = TODOS_POLOS.filter(p => polosNoMapa.has(p));
+    legendEl.innerHTML = polosOrdenados.map(p => `<div><i style="background:${corPolo(p)}"></i>${p}</div>`).join('');
+  }
 }
