@@ -25,15 +25,25 @@
 
 <nav class="topnav">
   <a data-view="apresentacao" class="active">Apresentação</a>
-  <a data-view="pib-populacao">PIB &amp; População</a>
+  <a data-view="pib-populacao">PIB e População</a>
   <a data-view="pib-per-capita">PIB Per Capita</a>
-  <a data-view="valor-adicionado">Valor Adicionado</a>
+  <a data-view="valor-adicionado">Valores Adicionados</a>
   <a data-view="indicadores-socioeconomicos">Indicadores Socioeconômicos</a>
-  <a data-view="producao-la">Produção de Lã</a>
-  <a data-view="ovinos">Ovinos</a>
-  <a data-view="indicadores-cordeiros">Indicadores da Produção</a>
-  <a data-view="trabalho">Trabalho</a>
-  <a data-view="indicadores-mercado-trabalho">Indicadores do Mercado de Trabalho</a>
+  <div class="nav-group">
+    <button class="nav-group-label" type="button">Produção de Ovinos <span class="caret">▾</span></button>
+    <div class="nav-dropdown">
+      <a data-view="producao-la">Lã</a>
+      <a data-view="ovinos">Ovinos</a>
+      <a data-view="indicadores-cordeiros">Indicadores da Produção</a>
+    </div>
+  </div>
+  <div class="nav-group">
+    <button class="nav-group-label" type="button">Mercado de Trabalho <span class="caret">▾</span></button>
+    <div class="nav-dropdown">
+      <a data-view="trabalho">Trabalho</a>
+      <a data-view="indicadores-mercado-trabalho">Indicadores do Mercado de Trabalho</a>
+    </div>
+  </div>
   <a data-view="indicadores-ambientais">Indicadores Ambientais</a>
 </nav>
 
@@ -156,8 +166,8 @@
       </div>
       <div class="grid-2">
         <div class="card">
-          <h2>Valor Produzido de Lã por Estado</h2>
-          <p class="desc">Substitui o gráfico de funil original por um ranking em barras horizontais.</p>
+          <h2>Valor Produzido de Lã por Estado e Polo</h2>
+          <p class="desc">Substitui o gráfico de funil original — barra empilhada por Polo dentro de cada Estado, mesmo padrão usado em PIB &amp; População.</p>
           <div class="chartwrap"><canvas id="chart-la-uf"></canvas></div>
         </div>
         <div class="card">

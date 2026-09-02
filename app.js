@@ -220,11 +220,29 @@ document.addEventListener('DOMContentLoaded', () => {
     a.addEventListener('click', () => {
       document.querySelectorAll('nav.topnav a').forEach(x => x.classList.remove('active'));
       document.querySelectorAll('.view').forEach(x => x.classList.remove('active'));
+      document.querySelectorAll('.nav-group-label').forEach(x => x.classList.remove('group-active'));
       a.classList.add('active');
       document.getElementById('view-' + a.dataset.view).classList.add('active');
+      const grupoPai = a.closest('.nav-group');
+      if (grupoPai) grupoPai.querySelector('.nav-group-label').classList.add('group-active');
+      document.querySelectorAll('.nav-dropdown').forEach(d => d.classList.remove('open'));
       renderizarViewAtiva();
     });
   });
+
+  document.querySelectorAll('.nav-group-label').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const dropdown = btn.nextElementSibling;
+      const jaAberto = dropdown.classList.contains('open');
+      document.querySelectorAll('.nav-dropdown').forEach(d => d.classList.remove('open'));
+      if (!jaAberto) dropdown.classList.add('open');
+    });
+  });
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.nav-dropdown').forEach(d => d.classList.remove('open'));
+  });
+
   ['f-ano-ini','f-ano-fim','f-uf','f-polo','f-mun'].forEach(id => {
     document.getElementById(id).addEventListener('change', aplicarFiltros);
   });
@@ -435,14 +453,23 @@ function renderProducaoLa() {
     options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}}} }
   });
 
-  const byUf = {};
-  doAno.filter(r=>r.id_indicador===IND.laValor).forEach(r => { const uf = MUN[r.cod_mun]?.sg_uf||'—'; byUf[uf]=(byUf[uf]||0)+(r.valor||0); });
-  const ufsRank = Object.keys(byUf).sort((a,b)=>byUf[b]-byUf[a]);
+  const byUfPolo = {};
+  doAno.filter(r=>r.id_indicador===IND.laValor).forEach(r => {
+    const uf = MUN[r.cod_mun]?.sg_uf || '—'; const polo = MUN[r.cod_mun]?.polo || '—';
+    byUfPolo[uf] = byUfPolo[uf] || {};
+    byUfPolo[uf][polo] = (byUfPolo[uf][polo] || 0) + (r.valor || 0);
+  });
+  const ufsOrdenadas = Object.keys(byUfPolo).sort((a,b) => {
+    const totalA = Object.values(byUfPolo[a]).reduce((s,v)=>s+v,0);
+    const totalB = Object.values(byUfPolo[b]).reduce((s,v)=>s+v,0);
+    return totalB - totalA;
+  });
+  const polosNaComposicao = [...new Set(doAno.filter(r=>r.id_indicador===IND.laValor).map(r => MUN[r.cod_mun]?.polo).filter(Boolean))].sort();
   destroyChart('chart-la-uf');
   charts['chart-la-uf'] = new Chart(document.getElementById('chart-la-uf').getContext('2d'), {
     type: 'bar',
-    data: { labels: ufsRank, datasets: [{ data: ufsRank.map(u=>byUf[u]), backgroundColor: 'var(--primary)'.trim() ? '#1351b4' : '#1351b4' }] },
-    options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}} }
+    data: { labels: ufsOrdenadas, datasets: polosNaComposicao.map(p => ({ label: p, data: ufsOrdenadas.map(u => byUfPolo[u][p] || 0), backgroundColor: corPolo(p) })) },
+    options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:9}}}}, scales:{x:{stacked:true},y:{stacked:true}} }
   });
 
   renderMapaGenerico('map-la', doAno.filter(r=>r.id_indicador===IND.laValor), r => r.valor, 'Valor da produção de lã', v => fmtR(v));
@@ -604,7 +631,7 @@ function renderMapaGenerico(elId, rows, getValor, label, fmt) {
   destroyMap(elId);
   const el = document.getElementById(elId);
   if (!el) return;
-  const map = L.map(elId, { zoomControl: true }).setView([-10, -42], 5);
+  const map = L.map(elId, { zoomControl: true });
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 18 }).addTo(map);
   mapInstances[elId] = map;
 
@@ -612,6 +639,7 @@ function renderMapaGenerico(elId, rows, getValor, label, fmt) {
   const max = valores.length ? Math.max(...valores) : 1;
   const min = valores.length ? Math.min(...valores) : 0;
   const polosNoMapa = new Set();
+  const pontos = []; // pra ajustar o zoom automaticamente aos dados que existem
 
   rows.forEach(r => {
     const loc = DATA.localizacao[String(r.cod_mun)];
@@ -623,12 +651,20 @@ function renderMapaGenerico(elId, rows, getValor, label, fmt) {
     const polo = mun?.polo;
     const cor = corPolo(polo);
     if (polo) polosNoMapa.add(polo);
+    pontos.push(loc);
     L.circleMarker([loc[0], loc[1]], {
       radius: raio, color: cor, weight: 1, fillColor: cor, fillOpacity: 0.65,
     }).bindTooltip(`<strong>${mun?.des_municipio || r.cod_mun}</strong><br>${polo || ''}<br>${label}: ${fmt(v)}`, { sticky: true }).addTo(map);
   });
 
-  // legenda de cores por polo (só os polos que de fato aparecem no mapa)
+  // zoom automático: enquadra só onde de fato existem pontos, em vez de um
+  // centro fixo — evita abrir o mapa numa região sem nenhum dado
+  if (pontos.length) {
+    map.fitBounds(pontos, { padding: [24, 24], maxZoom: 7 });
+  } else {
+    map.setView([-14, -52], 4); // Brasil inteiro, fallback sem nenhum ponto
+  }
+
   const legendEl = document.getElementById(elId + '-legend');
   if (legendEl) {
     const polosOrdenados = TODOS_POLOS.filter(p => polosNoMapa.has(p));
